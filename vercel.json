@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "app/api/monitor/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
