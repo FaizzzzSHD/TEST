@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, CheckCircle, Clock, TestTube, Zap, Globe, Shield, AlertTriangle } from "lucide-react"
+import { AlertCircle, CheckCircle, Clock, TestTube, Zap, Globe, AlertTriangle, Bot } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ANEMMonitor() {
@@ -24,6 +24,7 @@ export default function ANEMMonitor() {
   const [lastCheck, setLastCheck] = useState<string>("")
   const [appointmentStatus, setAppointmentStatus] = useState<"available" | "unavailable" | "unknown">("unknown")
   const [emailConfigured, setEmailConfigured] = useState<boolean | null>(null)
+  const [usePuppeteer, setUsePuppeteer] = useState(false)
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleString("fr-FR")
@@ -90,13 +91,15 @@ export default function ANEMMonitor() {
     }
 
     setIsRunning(true)
-    addLog("🚀 Démarrage du monitoring RÉEL du site ANEM...")
+    addLog(
+      `🚀 Démarrage du monitoring ANEM ${usePuppeteer ? "avec Puppeteer (navigateur réel)" : "en mode standard"}...`,
+    )
 
     try {
       const response = await fetch("/api/monitor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start", config }),
+        body: JSON.stringify({ action: "start", config, usePuppeteer }),
       })
 
       if (!response.ok) {
@@ -109,9 +112,9 @@ export default function ANEMMonitor() {
       const result = await response.json()
 
       if (result.success) {
-        addLog("✅ Monitoring RÉEL démarré avec succès")
+        addLog("✅ Monitoring démarré avec succès")
         addLog("🔄 Vérification automatique toutes les 10 minutes")
-        addLog("🌐 Connexion directe au site ANEM officiel")
+        addLog(`🎯 Mode: ${usePuppeteer ? "Puppeteer (navigateur réel)" : "Standard (avec fallback simulation)"}`)
 
         setEmailConfigured(result.emailConfigured)
 
@@ -139,7 +142,15 @@ export default function ANEMMonitor() {
             addLog(`🔍 URL finale: ${initial.debugInfo.finalUrl || "N/A"}`)
             addLog(`📊 Status HTTP: ${initial.debugInfo.statusCode || "N/A"}`)
             addLog(`🔐 Token CSRF: ${initial.debugInfo.hasToken ? "Trouvé" : "Non trouvé"}`)
-            addLog(`📄 Méthode: ${initial.debugInfo.method || "N/A"}`)
+            addLog(`📄 Méthode: ${initial.debugInfo.method || initial.debugInfo.mode || "N/A"}`)
+
+            if (initial.debugInfo.isPuppeteer) {
+              addLog("🤖 Méthode: PUPPETEER (navigateur réel)")
+            } else if (initial.debugInfo.isFetch) {
+              addLog("🌐 Méthode: FETCH (requête HTTP)")
+            } else if (initial.debugInfo.mode === "simulation") {
+              addLog("🎭 Méthode: SIMULATION (site bloque les bots)")
+            }
           }
 
           setAppointmentStatus(initial.appointmentAvailable ? "available" : "unavailable")
@@ -176,14 +187,13 @@ export default function ANEMMonitor() {
       return
     }
 
-    addLog("🔍 Vérification RÉELLE en cours...")
-    addLog("🌐 Connexion au site ANEM officiel...")
+    addLog(`🔍 Vérification ${usePuppeteer ? "avec Puppeteer (navigateur réel)" : "en mode standard"} en cours...`)
 
     try {
       const response = await fetch("/api/monitor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "check", config }),
+        body: JSON.stringify({ action: "check", config, usePuppeteer }),
       })
 
       if (!response.ok) {
@@ -209,7 +219,17 @@ export default function ANEMMonitor() {
           addLog(`📊 Status HTTP: ${result.debugInfo.statusCode || "N/A"}`)
           addLog(`🔐 Token CSRF: ${result.debugInfo.hasToken ? "Trouvé" : "Non trouvé"}`)
           addLog(`📄 Taille réponse: ${result.debugInfo.responseLength || 0} caractères`)
-          addLog(`🔧 Méthode: ${result.debugInfo.method || "N/A"}`)
+
+          if (result.debugInfo.isPuppeteer) {
+            addLog("🤖 Méthode utilisée: PUPPETEER (navigateur réel)")
+            if (result.debugInfo.title) {
+              addLog(`📄 Titre de la page: ${result.debugInfo.title}`)
+            }
+          } else if (result.debugInfo.isFetch) {
+            addLog("🌐 Méthode utilisée: FETCH (requête HTTP)")
+          } else if (result.debugInfo.mode === "simulation") {
+            addLog("🎭 Méthode utilisée: SIMULATION (site bloque les bots)")
+          }
 
           if (result.debugInfo.foundNoAppointmentMessage) {
             addLog(`🔍 Message trouvé: ${result.debugInfo.foundNoAppointmentMessage}`)
@@ -246,18 +266,18 @@ export default function ANEMMonitor() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
           <Zap className="h-8 w-8 text-green-500" />
-          Moniteur ANEM RÉEL
+          Moniteur ANEM - Version Avancée
         </h1>
         <p className="text-muted-foreground">
-          Surveillance automatique RÉELLE des rendez-vous sur le site ANEM officiel
+          Surveillance automatique avec Puppeteer (navigateur réel) et fallback intelligent
         </p>
       </div>
 
       <Alert className="mb-6 border-green-200 bg-green-50">
-        <Shield className="h-4 w-4 text-green-600" />
+        <Bot className="h-4 w-4 text-green-600" />
         <AlertDescription className="text-green-800">
-          <strong>Mode RÉEL activé :</strong> Ce système vérifie vraiment le site ANEM. Les emails sont optionnels - le
-          système fonctionne même sans configuration email.
+          <strong>Nouvelle version avec Puppeteer :</strong> Utilise un vrai navigateur pour contourner les protections
+          anti-bot du site ANEM. Fallback automatique vers simulation si nécessaire.
         </AlertDescription>
       </Alert>
 
@@ -265,8 +285,8 @@ export default function ANEMMonitor() {
         <Alert className="mb-6 border-yellow-200 bg-yellow-50">
           <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
-            <strong>Emails non configurés :</strong> Le système surveille le site ANEM mais n'enverra pas d'emails.
-            Configurez Web3Forms pour activer les notifications.
+            <strong>Emails non configurés :</strong> Le système surveille mais n'enverra pas d'emails. Configurez
+            Web3Forms pour activer les notifications.
           </AlertDescription>
         </Alert>
       )}
@@ -278,7 +298,7 @@ export default function ANEMMonitor() {
               <Globe className="h-5 w-5" />
               Configuration
             </CardTitle>
-            <CardDescription>Informations ANEM (obligatoires) et email (optionnel)</CardDescription>
+            <CardDescription>Informations ANEM (obligatoires) et options avancées</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -318,10 +338,23 @@ export default function ANEMMonitor() {
                 value={config.emailTo}
                 onChange={(e) => setConfig((prev) => ({ ...prev, emailTo: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">
-                Le système fonctionne sans email. Configurez Web3Forms pour les notifications.
-              </p>
             </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="puppeteer"
+                checked={usePuppeteer}
+                onChange={(e) => setUsePuppeteer(e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="puppeteer" className="text-sm">
+                🤖 Utiliser Puppeteer (navigateur réel) - RECOMMANDÉ
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Puppeteer simule un vrai navigateur pour contourner les protections anti-bot
+            </p>
 
             <Button onClick={handleTestEmail} variant="outline" className="w-full bg-transparent">
               <TestTube className="h-4 w-4 mr-2" />
@@ -330,7 +363,7 @@ export default function ANEMMonitor() {
 
             <div className="flex gap-2">
               <Button onClick={handleStart} disabled={isRunning} className="flex-1">
-                {isRunning ? "🔄 En cours..." : "🚀 Démarrer"}
+                {isRunning ? "🔄 En cours..." : usePuppeteer ? "🤖 Démarrer (Puppeteer)" : "🚀 Démarrer (Standard)"}
               </Button>
               <Button onClick={handleStop} disabled={!isRunning} variant="outline" className="flex-1 bg-transparent">
                 ⏹️ Arrêter
@@ -338,7 +371,7 @@ export default function ANEMMonitor() {
             </div>
 
             <Button onClick={handleCheckNow} variant="secondary" className="w-full">
-              🔍 Vérifier maintenant
+              {usePuppeteer ? "🤖 Vérifier avec Puppeteer" : "🔍 Vérifier maintenant"}
             </Button>
           </CardContent>
         </Card>
@@ -347,14 +380,23 @@ export default function ANEMMonitor() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Statut RÉEL
+              Statut - Version Avancée
             </CardTitle>
-            <CardDescription>État actuel de la surveillance du site ANEM</CardDescription>
+            <CardDescription>État actuel de la surveillance ANEM</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span>État:</span>
-              <Badge variant={isRunning ? "default" : "secondary"}>{isRunning ? "🔄 Actif (RÉEL)" : "⏸️ Inactif"}</Badge>
+              <Badge variant={isRunning ? "default" : "secondary"}>
+                {isRunning ? (usePuppeteer ? "🤖 Actif (Puppeteer)" : "🔄 Actif (Standard)") : "⏸️ Inactif"}
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span>Mode:</span>
+              <Badge variant={usePuppeteer ? "default" : "secondary"}>
+                {usePuppeteer ? "🤖 Puppeteer" : "🌐 Standard"}
+              </Badge>
             </div>
 
             <div className="flex items-center justify-between">
@@ -397,7 +439,7 @@ export default function ANEMMonitor() {
             </div>
 
             <div className="space-y-2">
-              <Label>Logs de vérification RÉELLE:</Label>
+              <Label>Logs de surveillance avancée:</Label>
               <div className="bg-muted rounded-md p-3 h-48 overflow-y-auto">
                 {logs.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Cliquez sur "Vérifier maintenant" pour commencer</p>
@@ -416,60 +458,59 @@ export default function ANEMMonitor() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>🎯 Instructions - Mode RÉEL</CardTitle>
+          <CardTitle>🤖 Puppeteer - La Solution Avancée</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            1. <strong>Entrez vos VRAIES informations ANEM</strong> (numéro de carte de demandeur d'emploi et numéro
-            d'identification nationale) - OBLIGATOIRE
+            1. <strong>Navigateur réel :</strong> Puppeteer lance un vrai navigateur Chrome pour contourner les
+            protections
           </p>
           <p>
-            2. <strong>Email optionnel :</strong> Le système fonctionne sans email. Pour les notifications, configurez
-            Web3Forms
+            2. <strong>JavaScript activé :</strong> Exécute le JavaScript comme un utilisateur normal
           </p>
           <p>
-            3. <strong>Testez d'abord</strong> avec "Vérifier maintenant" pour voir si vos informations sont correctes
+            3. <strong>Remplissage de formulaire :</strong> Peut saisir vos informations dans le formulaire ANEM
           </p>
           <p>
-            4. <strong>Démarrez le monitoring</strong> pour une surveillance automatique toutes les 10 minutes
+            4. <strong>Fallback intelligent :</strong> Si Puppeteer échoue, retombe sur fetch puis simulation
           </p>
           <p>
-            5. <strong>Consultez les logs</strong> pour suivre l'état de la surveillance en temps réel
+            5. <strong>Plus lent mais plus efficace :</strong> Prend 10-30 secondes mais contourne les blocages
           </p>
           <p className="text-green-600 font-medium">
-            ✅ <strong>Important :</strong> Le système surveille le site ANEM même sans configuration email.
+            ✅ <strong>Recommandé :</strong> Cochez "Utiliser Puppeteer" pour de meilleurs résultats !
           </p>
         </CardContent>
       </Card>
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>⚙️ Configuration Web3Forms (Optionnel)</CardTitle>
+          <CardTitle>📊 Comparaison des Méthodes</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p>
-            1. <strong>Allez sur</strong>{" "}
-            <a href="https://web3forms.com" target="_blank" className="text-blue-600 underline" rel="noreferrer">
-              web3forms.com
-            </a>
-          </p>
-          <p>
-            2. <strong>Créez un compte gratuit</strong> et obtenez votre Access Key
-          </p>
-          <p>
-            3. <strong>Dans Vercel Dashboard</strong> → Settings → Environment Variables
-          </p>
-          <p>
-            4. <strong>Ajoutez :</strong>{" "}
-            <code className="bg-gray-100 px-2 py-1 rounded">WEB3FORMS_ACCESS_KEY = votre_clé</code>
-          </p>
-          <p>
-            5. <strong>Redéployez</strong> votre application pour appliquer les changements
-          </p>
-          <p className="text-blue-600 font-medium">
-            💡 <strong>Note :</strong> Sans Web3Forms, le système surveille quand même le site ANEM, mais sans
-            notifications email.
-          </p>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="border rounded p-3">
+              <h4 className="font-semibold text-green-600">🤖 Puppeteer</h4>
+              <p>✅ Navigateur réel</p>
+              <p>✅ Contourne les protections</p>
+              <p>✅ JavaScript activé</p>
+              <p>⚠️ Plus lent (10-30s)</p>
+            </div>
+            <div className="border rounded p-3">
+              <h4 className="font-semibold text-blue-600">🌐 Fetch Standard</h4>
+              <p>✅ Rapide (2-5s)</p>
+              <p>✅ Léger</p>
+              <p>❌ Souvent bloqué</p>
+              <p>❌ Pas de JavaScript</p>
+            </div>
+            <div className="border rounded p-3">
+              <h4 className="font-semibold text-orange-600">🎭 Simulation</h4>
+              <p>✅ Toujours fonctionne</p>
+              <p>✅ Très rapide</p>
+              <p>✅ Réaliste (95% pas de RDV)</p>
+              <p>⚠️ Pas de vraie vérification</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
